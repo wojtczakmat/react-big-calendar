@@ -11,7 +11,9 @@ var _dates = require('./dates');
 
 var _dates2 = _interopRequireDefault(_dates);
 
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+function _interopRequireDefault(obj) {
+  return obj && obj.__esModule ? obj : { default: obj };
+}
 
 function startsBefore(date, min) {
   return _dates2.default.lt(_dates2.default.merge(min, date), min, 'minutes');
@@ -92,7 +94,8 @@ var isChild = function isChild(parentIdx, childIdx, _ref3) {
   var parentEnd = getSlot(events[parentIdx], endAccessor, min, totalMin);
   var childStart = getSlot(events[childIdx], startAccessor, min, totalMin);
 
-  return parentEnd > childStart;
+  return false;
+  //return parentEnd > childStart;
 };
 
 /**
@@ -223,6 +226,30 @@ var getYStyles = function getYStyles(idx, _ref6) {
   };
 };
 
+function sortSiblings(events, siblings) {
+  var ev = events[siblings[0]];
+  var sorted = [ev];
+  var starts = [ev];
+  siblings.splice(0, 1);
+  while (siblings.length > 0) {
+    var next = siblings.filter(function (v, i, a) {
+      return events[v].start >= ev.end; 
+    });
+
+    if (next.length > 0) {
+      ev = events[next[0]];
+      siblings.splice(siblings.indexOf(events.indexOf(ev)), 1);
+    } else {
+      ev = events[siblings[0]];
+      starts.push(ev);
+      siblings.splice(0, 1);
+    }
+
+    sorted.push(ev);
+  }
+  return { sorted: sorted.map(x => events.indexOf(x)), starts: starts.map(x => events.indexOf(x)) };
+}
+
 /**
  * Takes an array of unsorted events, and returns a sorted array
  * containing the same events, but with an additional style property.
@@ -277,26 +304,38 @@ function getStyledEvents(_ref7) {
 
     var nbrOfColumns = Math.max(nbrOfChildColumns, siblings.length) + 1;
 
+    var current = sortSiblings(events, [idx].concat(siblings));
+    var startId = -1;
+    var startOffset = -1;
     // Set styles to top level events.
-    [idx].concat(siblings).forEach(function (eventIdx) {
+    current.sorted.forEach(function (eventIdx) {
       var width = 100 * events[eventIdx].width;
-      var xAdjustment = width * (nbrOfColumns > 1 ? OVERLAP_MULTIPLIER : 0);
+      var xAdjustment = 0;
 
       var _getYStyles = getYStyles(eventIdx, helperArgs),
           top = _getYStyles.top,
           height = _getYStyles.height;
+      
+      if (startId < 0) {
+        xAdjustment = 0;
+      } else {
+        xAdjustment = styledEvents[startId].style.xOffset;
+      }
 
-      var prev = { style: { xOffset: 0, width: 0}};
-      if (eventIdx - idx > 0)
-        prev = styledEvents[eventIdx - 1];
+      if (current.starts.indexOf(eventIdx) >= 0) {
+        if (startId >= 0) {
+          xAdjustment += styledEvents[startId].style.width;
+        }
+        startId = eventIdx;
+      }
 
       styledEvents[eventIdx] = {
         event: events[eventIdx],
         style: {
           top: top,
           height: height,
-          width: width + xAdjustment,
-          xOffset: prev.style.xOffset + prev.style.width - xAdjustment
+          width: width,
+          xOffset: xAdjustment
         }
       };
     });
@@ -314,11 +353,13 @@ function getStyledEvents(_ref7) {
 
       // Set styles to child events.
       group.forEach(function (eventIdx, i) {
+        var width = 100 * events[eventIdx].width;
+
         var parentStyle = styledEvents[parentIdx].style;
 
         var spaceOccupiedByParent = parentStyle.width + parentStyle.xOffset;
-        var columns = Math.min(group.length, nbrOfColumns);
-        var width = (100 - spaceOccupiedByParent) / columns;
+        //var columns = Math.min(group.length, nbrOfColumns);
+        //var width = (100 - spaceOccupiedByParent) / columns;
         var xAdjustment = spaceOccupiedByParent * OVERLAP_MULTIPLIER;
 
         var _getYStyles2 = getYStyles(eventIdx, helperArgs),
@@ -331,7 +372,7 @@ function getStyledEvents(_ref7) {
             top: top,
             height: height,
             width: width + xAdjustment,
-            xOffset: spaceOccupiedByParent + width * i - xAdjustment
+            xOffset: parentStyle.xOffset + parentStyle.width - xAdjustment
           }
         };
       });
