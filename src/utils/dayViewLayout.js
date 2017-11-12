@@ -39,7 +39,13 @@ var sort = function sort(events, _ref) {
     var startB = +(0, _accessors.accessor)(b, startAccessor);
 
     if (startA === startB) {
-      return +(0, _accessors.accessor)(b, endAccessor) - +(0, _accessors.accessor)(a, endAccessor);
+      var widthA = a.width;
+      var widthB = b.width;
+      if (widthA === widthB) {
+        return +(0, _accessors.accessor)(b, endAccessor) - +(0, _accessors.accessor)(a, endAccessor);
+      }
+
+      return widthB - widthA;
     }
 
     return startA - startB;
@@ -114,11 +120,17 @@ var getSiblings = function getSiblings(idx, _ref4) {
   var nextIdx = idx;
   var siblings = [];
 
+  var uniqueFilter = (value, index, self) => { 
+    return self.indexOf(value) === index;
+  };
+
+
   while (isSibling(idx, ++nextIdx, { events: events, startAccessor: startAccessor, endAccessor: endAccessor, min: min, totalMin: totalMin, step: step, timeslots: timeslots })) {
     siblings.push(nextIdx);
+    //  siblings = siblings.concat(getSiblings(nextIdx, _ref4));
   }
 
-  return siblings;
+  return siblings;//.filter(uniqueFilter);
 };
 
 /**
@@ -228,12 +240,17 @@ var getYStyles = function getYStyles(idx, _ref6) {
 
 function sortSiblings(events, siblings) {
   var ev = events[siblings[0]];
-  var sorted = [ev];
+  var sorted = [[ev]];
+  var currentGroup = 0;
   var starts = [ev];
   siblings.splice(0, 1);
+
   while (siblings.length > 0) {
     var next = siblings.filter(function (v, i, a) {
-      return events[v].start >= ev.end; 
+      sorted.filter(function (val, ind) {
+      
+      });
+      return events[v].start >= ev.end;
     });
 
     if (next.length > 0) {
@@ -241,13 +258,67 @@ function sortSiblings(events, siblings) {
       siblings.splice(siblings.indexOf(events.indexOf(ev)), 1);
     } else {
       ev = events[siblings[0]];
+      currentGroup++;
+      sorted.push([]);
       starts.push(ev);
       siblings.splice(0, 1);
     }
-
-    sorted.push(ev);
+    sorted[currentGroup].push(ev);
   }
-  return { sorted: sorted.map(x => events.indexOf(x)), starts: starts.map(x => events.indexOf(x)) };
+
+  return { 
+    sorted: sorted.reduce((acc, x) => acc.concat(x.map(e => events.indexOf(e)))),
+    starts: starts.map(x => events.indexOf(x)) 
+  };
+}
+
+function sortEventsForLayout(events) {
+  if (events.length === 0) return [];
+
+  var unit = getUnitForEvents(events);
+  if (unit === 1.0) {
+    return events.map(x => {
+      return Object.assign({}, x, {
+        xOffset: 0
+      })
+    });
+  }
+
+  var laidOut = [Object.assign({}, events[0], { xOffset: 0 })];
+  events.forEach((ev, ind) => {
+    if (ind === 0) return;
+    
+    var fixedEv = Object.assign({ }, ev, { xOffset: 0 });
+    while (laidOut.filter(prev => areConflicting(fixedEv, prev)).length > 0) {
+      fixedEv.xOffset += unit;
+
+      if (fixedEv.xOffset >= 1.0) break;
+    }
+
+    laidOut.push(fixedEv);
+  });
+
+  return laidOut;
+}
+
+function getUnitForEvents(events) {
+  if (events.filter(ev => ev.width === 0.25 || ev.width === 0.75).length > 0) {
+    return 0.25;
+  } else if (events.filter(ev => ev.width === 0.33 || ev.width === 0.66 ).length > 0) {
+    return 0.33;
+  }
+  else if (events.filter(ev => ev.width === 0.5).length > 0) {
+    return 0.5
+  } else {
+    return 1.0;
+  }
+}
+
+function areConflicting(eventA, eventB) {
+  var areTimeConflicting = !(eventA.start >= eventB.end || eventB.start >= eventA.end);
+  var arePlaceConflicting = !((eventA.xOffset >= eventB.xOffset + eventB.width) ||
+    (eventB.xOffset >= eventA.xOffset + eventA.width));
+  return areTimeConflicting && arePlaceConflicting;
 }
 
 /**
@@ -304,30 +375,17 @@ function getStyledEvents(_ref7) {
 
     var nbrOfColumns = Math.max(nbrOfChildColumns, siblings.length) + 1;
 
-    var current = sortSiblings(events, [idx].concat(siblings));
-    var startId = -1;
-    var startOffset = -1;
+    var ids = [...Array(events.length).keys()];//[idx].concat(siblings);//sortSiblings(events, [idx].concat(siblings));
+    events = sortEventsForLayout(events);
+
     // Set styles to top level events.
-    current.sorted.forEach(function (eventIdx) {
+    ids.forEach(function (eventIdx) {
       var width = 100 * events[eventIdx].width;
       var xAdjustment = 0;
 
       var _getYStyles = getYStyles(eventIdx, helperArgs),
           top = _getYStyles.top,
           height = _getYStyles.height;
-      
-      if (startId < 0) {
-        xAdjustment = 0;
-      } else {
-        xAdjustment = styledEvents[startId].style.xOffset;
-      }
-
-      if (current.starts.indexOf(eventIdx) >= 0) {
-        if (startId >= 0) {
-          xAdjustment += styledEvents[startId].style.width;
-        }
-        startId = eventIdx;
-      }
 
       styledEvents[eventIdx] = {
         event: events[eventIdx],
@@ -335,7 +393,7 @@ function getStyledEvents(_ref7) {
           top: top,
           height: height,
           width: width,
-          xOffset: xAdjustment
+          xOffset: 100 * events[eventIdx].xOffset
         }
       };
     });
