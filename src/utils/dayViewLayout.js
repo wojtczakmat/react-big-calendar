@@ -290,7 +290,11 @@ function sortEventsForLayout(events) {
     
     var fixedEv = Object.assign({ }, ev, { xOffset: 0 });
     while (laidOut.filter(prev => areConflicting(fixedEv, prev)).length > 0) {
-      fixedEv.xOffset += unit;
+      if (ev.width > unit) {
+        fixedEv.xOffset = 1 - ev.width
+      } else {
+        fixedEv.xOffset += unit;
+      }
 
       if (fixedEv.xOffset >= 1.0) break;
     }

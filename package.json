@@ -1,6 +1,6 @@
 {
   "name": "@leancode/react-big-calendar",
-  "version": "0.16.4",
+  "version": "0.16.5",
   "description": "Calendar! with events",
   "author": "Mateusz Wojtczak <wojtczakmat@gmail.com>",
   "repository": "wojtczakmat/react-big-calendar",
