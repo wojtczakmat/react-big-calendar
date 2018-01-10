@@ -308,7 +308,7 @@ function sortEventsForLayout(events) {
 function getUnitForEvents(events) {
   if (events.filter(ev => ev.width === 0.25 || ev.width === 0.75).length > 0) {
     return 0.25;
-  } else if (events.filter(ev => ev.width === 0.33 || ev.width === 0.66 ).length > 0) {
+  } else if (events.filter(ev => ev.width === (1 / 3) || ev.width === (2 / 3)).length > 0) {
     return 0.33;
   }
   else if (events.filter(ev => ev.width === 0.5).length > 0) {
@@ -379,7 +379,7 @@ function getStyledEvents(_ref7) {
 
     var nbrOfColumns = Math.max(nbrOfChildColumns, siblings.length) + 1;
 
-    var ids = [...Array(events.length).keys()];//[idx].concat(siblings);//sortSiblings(events, [idx].concat(siblings));
+    var ids = Array.apply(null, { length: events.length }).map(Number.call, Number);//[idx].concat(siblings);//sortSiblings(events, [idx].concat(siblings));
     events = sortEventsForLayout(events);
 
     // Set styles to top level events.
